@@ -12,7 +12,6 @@ char *getin(FILE *fp);
 off_t getfsize(FILE *fp);
 int cntlines(const char *buf);
 void splitbuf(char *buf, char *lineptr[]);
-void bsortstr(char *a[], int n, int (*cmp)(char *, char *));
 void qsortstr(char *a[], int left, int right, int (*cmp)(char *, char*));
 int part(char *a[], int left, int right, int (*cmp)(char *, char *));
 void swap(char *a[], int i, int j);
@@ -122,15 +121,6 @@ void splitbuf(char *buf, char *lineptr[])
                         beg = &buf[i+1];
                 }
         }
-}
-
-/* bsortstr: sort strings lexicographically into increasing order */
-void bsortstr(char *a[], int n, int (*cmp)(char *, char *))
-{
-        for (int i = 0; i < n-1; i++)
-                for (int j = 0; j < n-1; j++)
-                        if (cmp(a[j], a[j+1]) > 0) 
-                                swap(a, j, j+1);
 }
 
 /* qsortstr: sort strings a[left]...a[right] 
