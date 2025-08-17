@@ -12,10 +12,12 @@ char *getin(FILE *fp);
 off_t getfsize(FILE *fp);
 int cntlines(const char *buf);
 void splitbuf(char *buf, char *lineptr[]);
-void bsortstr(char *a[], int n);
-void qsortstr(char *a[], int left, int right);
-int part(char *a[], int left, int right);
+void bsortstr(char *a[], int n, int (*cmp)(char *, char *));
+void qsortstr(char *a[], int left, int right, int (*cmp)(char *, char*));
+int part(char *a[], int left, int right, int (*cmp)(char *, char *));
 void swap(char *a[], int i, int j);
+int cmpfwd(char *s, char *t);
+int cmpbwd(char *s, char *t);
 
 int main(int argc, char *argv[])
 {
@@ -38,8 +40,11 @@ int main(int argc, char *argv[])
         int nlines = cntlines(buf);
         char **lineptr = (char **) calloc(nlines, sizeof(char *));
         splitbuf(buf, lineptr);
-        qsortstr(lineptr, 0, nlines-1);
-
+        qsortstr(lineptr, 0, nlines-1, cmpfwd);
+        for (int i = 0; i < nlines; i++)
+                printf("%s\n", lineptr[i]);
+        printf("***\n");
+        qsortstr(lineptr, 0, nlines-1, cmpbwd);
         for (int i = 0; i < nlines; i++)
                 printf("%s\n", lineptr[i]);
 
@@ -120,32 +125,32 @@ void splitbuf(char *buf, char *lineptr[])
 }
 
 /* bsortstr: sort strings lexicographically into increasing order */
-void bsortstr(char *a[], int n)
+void bsortstr(char *a[], int n, int (*cmp)(char *, char *))
 {
         for (int i = 0; i < n-1; i++)
                 for (int j = 0; j < n-1; j++)
-                        if (strcmp(a[j], a[j+1]) > 0) 
+                        if (cmp(a[j], a[j+1]) > 0) 
                                 swap(a, j, j+1);
 }
 
 /* qsortstr: sort strings a[left]...a[right] 
  * lexicographically into increasing order */
-void qsortstr(char *a[], int left, int right)
+void qsortstr(char *a[], int left, int right, int (*cmp)(char *, char *))
 {
         if (left >= right) /* only two elements left */
                 return;
-        int pivot = part(a, left, right);
-        qsortstr(a, left, pivot-1); /* sort low part */
-        qsortstr(a, pivot+1, right); /* sort high part */
+        int pivot = part(a, left, right, cmp);
+        qsortstr(a, left, pivot-1, cmp); /* sort low part */
+        qsortstr(a, pivot+1, right, cmp); /* sort high part */
 }
 
 /* part: partition array of strings */
-int part(char *a[], int left, int right)
+int part(char *a[], int left, int right, int (*cmp)(char *, char*))
 {
         char *pivot = a[right];
         int i = left - 1; /* end of low part */
         for (int j = left; j <= right-1; j++)
-                if (strcmp(a[j], pivot) < 0) {
+                if (cmp(a[j], pivot) < 0) {
                         i++;
                         swap(a, j, i);
                 }
@@ -159,4 +164,28 @@ void swap(char *a[], int i, int j)
         char *tmp = a[i];
         a[i] = a[j];
         a[j] = tmp;
+}
+
+/* cmpfwd: compare string s to string t,
+ * return <0 if s<t, 0 if s==t, >0 if s>t */
+int cmpfwd(char *s, char *t)
+{
+        int i;
+        for (i = 0; s[i] == t[i]; i++)
+                if (s[i] == 0)
+                        return 0;
+        return s[i] - t[i];
+}
+
+/* cmpbwd: compare string s to string t backwards */
+int cmpbwd(char *s, char *t)
+{
+        int i, j;
+        for (i = strlen(s)-1, j = strlen(t)-1; s[i] == t[j]; i--, j--) {
+                if (i == 0) /* s is shorter */
+                        return -1;
+                else if (j == 0) /* t is shorter */
+                        return 1;
+        }
+        return s[i] - t[j];
 }
