@@ -12,11 +12,11 @@ char *getin(FILE *fp);
 off_t getfsize(FILE *fp);
 int cntlines(const char *buf);
 void splitbuf(char *buf, char *lineptr[]);
-void qsortstr(char *a[], int left, int right, int (*cmp)(char *, char*));
-int part(char *a[], int left, int right, int (*cmp)(char *, char *));
-void swap(char *a[], int i, int j);
-int cmpfwd(char *s, char *t);
-int cmpbwd(char *s, char *t);
+void myqsort(void *base, size_t size, int left, int right, int (*cmp)(void *, void *));
+int part(void *base, size_t size, int left, int right, int (*cmp)(void *, void *));
+void swap(void *base, size_t size, int i, int j);
+int cmpfwd(void *s, void *t);
+int cmpbwd(void *s, void *t);
 
 int main(int argc, char *argv[])
 {
@@ -39,11 +39,12 @@ int main(int argc, char *argv[])
         int nlines = cntlines(buf);
         char **lineptr = (char **) calloc(nlines, sizeof(char *));
         splitbuf(buf, lineptr);
-        qsortstr(lineptr, 0, nlines-1, cmpfwd);
+
+        myqsort(lineptr, sizeof(char *), 0, nlines-1, cmpfwd);
         for (int i = 0; i < nlines; i++)
                 printf("%s\n", lineptr[i]);
         printf("***\n");
-        qsortstr(lineptr, 0, nlines-1, cmpbwd);
+        myqsort(lineptr, sizeof(char *), 0, nlines-1, cmpbwd);
         for (int i = 0; i < nlines; i++)
                 printf("%s\n", lineptr[i]);
 
@@ -79,7 +80,7 @@ char *getin(FILE *fp)
 off_t getfsize(FILE *fp)
 {
         off_t size = 0;
-        struct stat stbuf = {};
+        struct stat stbuf = {0};
         int fd = fileno(fp);
         if (fd < 0) {
                 perror("fileno");
@@ -123,59 +124,81 @@ void splitbuf(char *buf, char *lineptr[])
         }
 }
 
-/* qsortstr: sort strings a[left]...a[right] 
- * lexicographically into increasing order */
-void qsortstr(char *a[], int left, int right, int (*cmp)(char *, char *))
+/* myqsort: sort base[left]...base[right] */
+void myqsort(void *base, size_t size, int left, int right, int (*cmp)(void *, void *))
 {
         if (left >= right) /* only two elements left */
                 return;
-        int pivot = part(a, left, right, cmp);
-        qsortstr(a, left, pivot-1, cmp); /* sort low part */
-        qsortstr(a, pivot+1, right, cmp); /* sort high part */
+        int pivot = part(base, size, left, right, cmp);
+        myqsort(base, size, left, pivot-1, cmp); /* sort low part */
+        myqsort(base, size, pivot+1, right, cmp); /* sort high part */
 }
 
-/* part: partition array of strings */
-int part(char *a[], int left, int right, int (*cmp)(char *, char*))
+/* part: partition array */
+int part(void *base, size_t size, int left, int right, int (*cmp)(void *, void *))
 {
-        char *pivot = a[right];
+        void *pivot = calloc(1, size);
+        if (!pivot) {
+                perror("calloc");
+                exit(1);
+        }
+
+        memcpy(pivot, (char *) base+right*size, size);
         int i = left - 1; /* end of low part */
         for (int j = left; j <= right-1; j++)
-                if (cmp(a[j], pivot) < 0) {
+                if (cmp((char *) base+j*size, pivot) < 0) {
                         i++;
-                        swap(a, j, i);
+                        swap(base, size, j, i);
                 }
-        swap(a, right, i+1); /* place pivot at appropriate place */
+        swap(base, size, right, i+1);
+
+        free(pivot);
+        pivot = NULL;
         return i+1;
 }
 
-/* swap: swap a[i] and a[j] */
-void swap(char *a[], int i, int j)
+/* swap: swap base[i] and base[j] */
+void swap(void *base, size_t size, int i, int j)
 {
-        char *tmp = a[i];
-        a[i] = a[j];
-        a[j] = tmp;
+        void *tmp = calloc(1, size);
+        if (!tmp) {
+                perror("calloc");
+                exit(1);
+        }
+
+        memcpy(tmp, (char *) base+i*size, size);
+        memcpy((char *) base+i*size, (char *) base+j*size, size);
+        memcpy((char *) base+j*size, tmp, size);
+
+        free(tmp);
+        tmp = NULL;
 }
 
-/* cmpfwd: compare string s to string t,
- * return <0 if s<t, 0 if s==t, >0 if s>t */
-int cmpfwd(char *s, char *t)
+/* cmpfwd: compare string s1 to string s2 */
+int cmpfwd(void *p1, void *p2)
 {
         int i;
-        for (i = 0; s[i] == t[i]; i++)
-                if (s[i] == 0)
+        char *s1 = *(char **) p1;
+        char *s2 = *(char **) p2;
+
+        for (i = 0; s1[i] == s2[i]; i++)
+                if (s1[i] == 0)
                         return 0;
-        return s[i] - t[i];
+        return s1[i] - s2[i];
 }
 
-/* cmpbwd: compare string s to string t backwards */
-int cmpbwd(char *s, char *t)
+/* cmpbwd: compare string s1 to string s2 backwards */
+int cmpbwd(void *p1, void *p2)
 {
         int i, j;
-        for (i = strlen(s)-1, j = strlen(t)-1; s[i] == t[j]; i--, j--) {
+        char *s1 = *(char **) p1;
+        char *s2 = *(char **) p2;
+
+        for (i = strlen(s1)-1, j = strlen(s2)-1; s1[i] == s2[j]; i--, j--) {
                 if (i == 0) /* s is shorter */
                         return -1;
                 else if (j == 0) /* t is shorter */
                         return 1;
         }
-        return s[i] - t[j];
+        return s1[i] - s2[j];
 }
