@@ -20,31 +20,53 @@ int cmpbwd(void *s, void *t);
 
 int main(int argc, char *argv[])
 {
-        if (argc != 2) {
-                fprintf(stderr, "usage: %s <filename>\n", argv[0]);
-                exit(1);
+        FILE *fp;
+        char *buf;
+        int nlines;
+        char **lineptr;
+        int i, j;
+        int c;
+        int bflag = 0;
+
+        for (i = 1; i < argc && argv[i][0] == '-'; i++)
+                for (j = 1; (c = argv[i][j]) != '\0'; j++)
+                        switch (c) {
+                                case 'b':
+                                        bflag = 1;
+                                        break;
+                                default:
+                                        fprintf(stderr, "%s: Illegal option -%c\n", argv[0], c);
+                                        return 1;
+                        }
+        if (i >= argc) {
+                printf("Usage: %s [-b] file\n", argv[0]);
+                return 1;
         }
 
-        FILE *fp = fopen(argv[1], "r");
+        fp = fopen(argv[i], "r");
         if (!fp) {
                 perror("fopen");
-                exit(1);
+                return 1;
         }
-        char *buf = getin(fp);
+        buf = getin(fp);
         if (fclose(fp) < 0) {
                 perror("fclose");
-                exit(1);
+                return 1;
         }
 
-        int nlines = cntlines(buf);
-        char **lineptr = (char **) calloc(nlines, sizeof(char *));
+        nlines = cntlines(buf);
+        lineptr = (char **) calloc(nlines, sizeof(char *));
+        if (!lineptr) {
+                perror("calloc");
+                return 1;
+        }
         splitbuf(buf, lineptr);
 
-        myqsort(lineptr, sizeof(char *), 0, nlines-1, cmpfwd);
-        for (int i = 0; i < nlines; i++)
-                printf("%s\n", lineptr[i]);
-        printf("***\n");
-        myqsort(lineptr, sizeof(char *), 0, nlines-1, cmpbwd);
+        if (bflag)
+                myqsort(lineptr, sizeof(char *), 0, nlines-1, cmpbwd);
+        else
+                myqsort(lineptr, sizeof(char *), 0, nlines-1, cmpfwd);
+
         for (int i = 0; i < nlines; i++)
                 printf("%s\n", lineptr[i]);
 
@@ -53,7 +75,6 @@ int main(int argc, char *argv[])
 
         free(buf);
         buf = NULL;
-
         return 0;
 }
 
